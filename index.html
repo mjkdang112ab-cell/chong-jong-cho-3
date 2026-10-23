@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Arcade: Dungeon Quest & Cyber Games</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        pixel: ['"Press Start 2P"', 'cursive'],
+                        rajdhani: ['Rajdhani', 'sans-serif'],
+                    },
+                    colors: {
+                        neonCyan: '#00f3ff',
+                        neonPink: '#ff0055',
+                        neonYellow: '#ffe600',
+                        neonPurple: '#b026ff',
+                        darkBg: '#090a0f',
+                        cardBg: '#121520'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #090a0f;
+            color: #fff;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        .pixel-font { font-family: 'Press Start 2P', cursive; }
+        
+        /* CRT Scanline Effect */
+        .scanlines::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 40;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #090a0f; }
+        ::-webkit-scrollbar-thumb { background: #00f3ff; border-radius: 3px; }
+
+        /* Glowing text & borders */
+        .glow-cyan { text-shadow: 0 0 10px #00f3ff, 0 0 20px #00f3ff; }
+        .glow-pink { text-shadow: 0 0 10px #ff0055, 0 0 20px #ff0055; }
+        .box-glow-cyan { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4); }
+        .box-glow-pink { box-shadow: 0 0 15px rgba(255, 0, 85, 0.4); }
+
+        /* Animation Keyframes */
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 10px #00f3ff); }
+            50% { filter: drop-shadow(0 0 25px #ff0055); }
+        }
+        .animate-glow { animation: pulseGlow 3s infinite; }
+        
+        /* Canvas Responsive Container */
+        #gameCanvas {
+            background: #050608;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-between scanlines relative overflow-hidden">
+
+    <!-- TOP HEADER / NAVBAR -->
+    <header class="w-full bg-slate-900/90 border-b border-cyan-500/30 px-4 py-2.5 flex justify-between items-center z-50 backdrop-blur-md">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="switchScreen('menuScreen')">
+            <div class="w-9 h-9 rounded bg-gradient-to-br from-cyan-400 to-pink-500 flex items-center justify-center text-slate-950 font-bold text-xl shadow-lg shadow-cyan-500/50">
+                <i class="fa-solid fa-gamepad"></i>
+            </div>
+            <div>
+                <h1 class="pixel-font text-xs md:text-sm text-neonCyan tracking-wider">PIXEL HUB</h1>
+                <p class="text-[10px] text-slate-400 tracking-widest hidden sm:block">ARCADE RETRO QUEST</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4 text-sm font-semibold">
+            <!-- Vàng hiện tại -->
+            <div class="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-yellow-500/40 text-yellow-400">
+                <i class="fa-solid fa-coins text-amber-300 animate-bounce"></i>
+                <span id="globalCoinsDisplay" class="pixel-font text-xs text-yellow-300">0</span>
+            </div>
+
+            <!-- Nút Âm Thanh -->
+            <button id="toggleAudioBtn" onclick="toggleAudio()" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center text-cyan-400 transition-all">
+                <i id="audioIcon" class="fa-solid fa-volume-high"></i>
+            </button>
+
+            <!-- Nút Cài đặt -->
+            <button onclick="openModal('settingsModal')" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center text-pink-400 transition-all">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN SCREEN CONTAINER -->
+    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden p-2">
+
+        <!-- 1. MAIN MENU SCREEN -->
+        <section id="menuScreen" class="w-full max-w-4xl flex flex-col items-center justify-center text-center z-30 transition-all duration-300">
+            <div class="mb-6 space-y-2">
+                <span class="px-3 py-1 bg-pink-500/20 text-pink-400 border border-pink-500/40 rounded-full text-xs font-bold uppercase tracking-widest">
+                    Chế độ Arcade v2.5
+                </span>
+                <h2 class="text-4xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-300 animate-glow py-2">
+                    DUNGEON QUEST
+                </h2>
+                <p class="text-slate-400 text-sm md:text-base max-w-md mx-auto">
+                    Tiêu diệt quái vật, né tránh chướng ngại vật, thu thập kho báu và hạ gục Trùm Cuối!
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md px-4">
+                <button onclick="startGame('dungeon')" class="group relative px-6 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-bold text-lg text-slate-950 hover:brightness-125 transition-all box-glow-cyan flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-play text-xl group-hover:scale-125 transition-transform"></i>
+                    <span>PLAY DUNGEON</span>
+                </button>
+
+                <button onclick="openModal('shopModal')" class="group relative px-6 py-4 rounded-xl bg-slate-800 border border-yellow-500/50 font-bold text-lg text-yellow-400 hover:bg-yellow-500/10 transition-all flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-store text-xl group-hover:rotate-12 transition-transform"></i>
+                    <span>SHOP NÂNG CẤP</span>
+                </button>
+
+                <button onclick="openModal('leaderboardModal')" class="group px-6 py-3.5 rounded-xl bg-slate-800/80 border border-slate-700 font-semibold text-slate-200 hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400"></i>
+                    <span>Xếp Hạng</span>
+                </button>
+
+                <button onclick="openModal('helpModal')" class="group px-6 py-3.5 rounded-xl bg-slate-800/80 border border-slate-700 font-semibold text-slate-200 hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-circle-question text-cyan-400"></i>
+                    <span>Hướng Dẫn</span>
+                </button>
+            </div>
+
+            <!-- Character Select Preview -->
+            <div class="mt-8 p-4 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center gap-4">
+                <div class="text-left">
+                    <div class="text-xs text-slate-400 uppercase tracking-wider">Nhân vật chọn:</div>
+                    <div id="selectedHeroName" class="text-cyan-400 font-bold text-lg">Cyber Knight</div>
+                </div>
+                <button onclick="cycleHero()" class="px-3 py-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-bold hover:bg-cyan-500/30 transition">
+                    Đổi Hero <i class="fa-solid fa-arrows-rotate ml-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. GAMEPLAY CANVAS SCREEN -->
+        <section id="gameScreen" class="hidden relative w-full h-full flex flex-col items-center justify-center max-w-5xl">
+            <!-- HUD Top Overlay -->
+            <div class="absolute top-2 left-2 right-2 z-20 flex justify-between items-center px-4 py-2 bg-slate-950/80 rounded-xl border border-slate-800/80 backdrop-blur-sm pointer-events-none">
+                <!-- HP Bar -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-heart text-pink-500 text-lg animate-pulse"></i>
+                    <div class="w-32 md:w-48 h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                        <div id="hpBar" class="h-full bg-gradient-to-r from-pink-600 to-red-500 transition-all duration-200" style="width: 100%;"></div>
+                    </div>
+                    <span id="hpText" class="text-xs font-bold text-pink-300">100/100</span>
+                </div>
+
+                <!-- Score & Level -->
+                <div class="text-center">
+                    <div id="hudScore" class="pixel-font text-sm md:text-base text-yellow-300">000000</div>
+                    <div id="hudLevel" class="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">STAGE 1</div>
+                </div>
+
+                <!-- Pause Button (Pointer events enabled) -->
+                <div class="pointer-events-auto flex gap-2">
+                    <button onclick="togglePause()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 flex items-center justify-center text-xs">
+                        <i id="pauseIcon" class="fa-solid fa-pause"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Boss HP Overlay (Tự ẩn/hiện) -->
+            <div id="bossHud" class="hidden absolute top-16 left-1/2 -translate-x-1/2 w-3/4 max-w-md z-20 bg-slate-950/90 border border-red-500/50 p-2 rounded-xl text-center backdrop-blur-md">
+                <div class="flex justify-between items-center text-xs text-red-400 font-bold mb-1">
+                    <span><i class="fa-solid fa-skull mr-1"></i> TRÙM CUỐI: CYBER MECHA</span>
+                    <span id="bossHpText">1000/1000</span>
+                </div>
+                <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-red-900">
+                    <div id="bossHpBar" class="h-full bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 transition-all duration-150" style="width: 100%;"></div>
+                </div>
+            </div>
+
+            <!-- GAME CANVAS -->
+            <canvas id="gameCanvas" class="w-full h-full max-h-[80vh] rounded-2xl border border-slate-800 shadow-2xl object-contain"></canvas>
+
+            <!-- Touch Controls cho Mobile -->
+            <div id="mobileControls" class="w-full flex justify-between items-center px-4 pt-2 z-20 md:hidden">
+                <!-- D-Pad Left/Right -->
+                <div class="flex gap-2">
+                    <button id="btnLeft" class="w-14 h-14 bg-slate-800/80 active:bg-cyan-500/50 border border-slate-700 rounded-2xl text-cyan-400 text-xl flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <button id="btnRight" class="w-14 h-14 bg-slate-800/80 active:bg-cyan-500/50 border border-slate-700 rounded-2xl text-cyan-400 text-xl flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button id="btnShoot" class="w-14 h-14 bg-pink-600/80 active:bg-pink-500 border border-pink-400 rounded-full text-white text-lg flex items-center justify-center shadow-lg shadow-pink-600/30">
+                        <i class="fa-solid fa-crosshair"></i>
+                    </button>
+                    <button id="btnJump" class="w-14 h-14 bg-cyan-600/80 active:bg-cyan-500 border border-cyan-400 rounded-full text-white text-lg flex items-center justify-center shadow-lg shadow-cyan-600/30">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="w-full bg-slate-950/90 border-t border-slate-800/80 py-2 px-4 text-center text-xs text-slate-500 z-50">
+        <span>&copy; 2026 Pixel Arcade Studio. Phát triển bằng HTML5 Canvas & Web Audio API.</span>
+    </footer>
+
+    <!-- MODAL POPUPS -->
+
+    <!-- 1. MODAL PAUSE -->
+    <div id="pauseModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-cyan-500/40 p-6 rounded-2xl w-full max-w-sm text-center box-glow-cyan">
+            <h3 class="pixel-font text-xl text-cyan-400 mb-4">TẠM DỪNG</h3>
+            <div class="space-y-3">
+                <button onclick="togglePause()" class="w-full py-3 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 transition">Tiếp Tục Game</button>
+                <button onclick="restartGame()" class="w-full py-3 bg-slate-800 text-slate-200 border border-slate-700 font-bold rounded-xl hover:bg-slate-700 transition">Chơi Lại Stage</button>
+                <button onclick="quitToMenu()" class="w-full py-3 bg-pink-600/20 text-pink-400 border border-pink-500/30 font-bold rounded-xl hover:bg-pink-600/30 transition">Về Menu Chính</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MODAL GAME OVER -->
+    <div id="gameOverModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-red-500/50 p-6 rounded-2xl w-full max-w-sm text-center box-glow-pink">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-red-500/20 border border-red-500 flex items-center justify-center text-red-500 text-2xl animate-bounce">
+                <i class="fa-solid fa-skull"></i>
+            </div>
+            <h3 class="pixel-font text-2xl text-red-500 mb-2">GAME OVER</h3>
+            <p class="text-slate-400 text-sm mb-4">Bạn đã hy sinh trong ngục tối!</p>
+            
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-5 space-y-1">
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Điểm đạt được:</span>
+                    <span id="goScore" class="font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Vàng thu thập:</span>
+                    <span id="goCoins" class="font-bold text-amber-300">0</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="restartGame()" class="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold rounded-xl hover:brightness-110 transition">Chơi Lại</button>
+                <button onclick="quitToMenu()" class="flex-1 py-3 bg-slate-800 text-slate-300 border border-slate-700 font-bold rounded-xl hover:bg-slate-700 transition">Thoát</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. MODAL VICTORY -->
+    <div id="victoryModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-yellow-500/50 p-6 rounded-2xl w-full max-w-sm text-center box-glow-cyan">
+            <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-yellow-500/20 border border-yellow-500 flex items-center justify-center text-yellow-400 text-2xl animate-pulse">
+                <i class="fa-solid fa-crown"></i>
+            </div>
+            <h3 class="pixel-font text-xl text-yellow-400 mb-1">CHIẾN THẮNG!</h3>
+            <p class="text-cyan-300 text-xs mb-4">Bạn đã dọn sạch ngục tối và hạ gục Trùm!</p>
+
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-5 space-y-1">
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Tổng điểm:</span>
+                    <span id="vicScore" class="font-bold text-yellow-400">0</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Vàng nhận được:</span>
+                    <span id="vicCoins" class="font-bold text-amber-300">+0</span>
+                </div>
+            </div>
+
+            <button onclick="quitToMenu()" class="w-full py-3 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-950 font-bold rounded-xl hover:brightness-110 transition">Hoàn Thành & Nhận Thưởng</button>
+        </div>
+    </div>
+
+    <!-- 4. MODAL SHOP NÂNG CẤP -->
+    <div id="shopModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-yellow-500/40 p-6 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col justify-between">
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="pixel-font text-base text-yellow-400 flex items-center gap-2">
+                        <i class="fa-solid fa-store"></i> CỬA HÀNG TRANG BỊ
+                    </h3>
+                    <button onclick="closeModal('shopModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+
+                <!-- List nâng cấp -->
+                <div class="space-y-3 overflow-y-auto max-h-[55vh] pr-1">
+                    <!-- Upgrade HP -->
+                    <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 text-lg">
+                                <i class="fa-solid fa-heart"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-slate-200">Máu Tối Đa (HP)</div>
+                                <div class="text-xs text-slate-400">Tăng HP tối đa lên +20</div>
+                            </div>
+                        </div>
+                        <button onclick="buyUpgrade('hp')" class="px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                            <span id="shopHpCost">100</span> <i class="fa-solid fa-coins text-amber-400"></i>
+                        </button>
+                    </div>
+
+                    <!-- Upgrade Damage -->
+                    <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 text-lg">
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-slate-200">Sức Mạnh Sát Thương</div>
+                                <div class="text-xs text-slate-400">Tăng sát thương đạn +5</div>
+                            </div>
+                        </div>
+                        <button onclick="buyUpgrade('damage')" class="px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                            <span id="shopDmgCost">150</span> <i class="fa-solid fa-coins text-amber-400"></i>
+                        </button>
+                    </div>
+
+                    <!-- Upgrade Speed -->
+                    <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-lg bg-green-500/20 border border-green-500/40 flex items-center justify-center text-green-400 text-lg">
+                                <i class="fa-solid fa-person-running"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-sm text-slate-200">Tốc Độ Di Chuyển</div>
+                                <div class="text-xs text-slate-400">Tăng tốc độ chạy +10%</div>
+                            </div>
+                        </div>
+                        <button onclick="buyUpgrade('speed')" class="px-3 py-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/40 rounded-lg text-xs font-bold transition flex items-center gap-1">
+                            <span id="shopSpeedCost">120</span> <i class="fa-solid fa-coins text-amber-400"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800 flex justify-end">
+                <button onclick="closeModal('shopModal')" class="px-5 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MODAL LEADERBOARD -->
+    <div id="leaderboardModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-cyan-500/40 p-6 rounded-2xl w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="pixel-font text-sm text-cyan-400 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400"></i> BẢNG XẾP HẠNG
+                </h3>
+                <button onclick="closeModal('leaderboardModal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div id="leaderboardList" class="space-y-2 mb-4 max-h-60 overflow-y-auto pr-1">
+                <!-- Javascript sẽ điền dữ liệu -->
+            </div>
+
+            <button onclick="closeModal('leaderboardModal')" class="w-full py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition">Đóng</button>
+        </div>
+    </div>
+
+    <!-- 6. MODAL HƯỚNG DẪN -->
+    <div id="helpModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md">
+            <h3 class="pixel-font text-sm text-cyan-400 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-circle-question"></i> HƯỚNG DẪN ĐIỀU KHIỂN
+            </h3>
+
+            <div class="space-y-3 text-sm text-slate-300 mb-6">
+                <div class="flex items-center justify-between p-2 bg-slate-950 rounded-lg">
+                    <span>Di chuyển Trái / Phải:</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-xs font-mono text-yellow-300">A / D hoặc Mũi Tên</span>
+                </div>
+                <div class="flex items-center justify-between p-2 bg-slate-950 rounded-lg">
+                    <span>Nhảy cao:</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-xs font-mono text-yellow-300">W / SpaceBar / Mũi Tên Lên</span>
+                </div>
+                <div class="flex items-center justify-between p-2 bg-slate-950 rounded-lg">
+                    <span>Bắn đạn năng lượng:</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-xs font-mono text-yellow-300">J / Z / Nút Bắn (Cảm ứng)</span>
+                </div>
+                <div class="flex items-center justify-between p-2 bg-slate-950 rounded-lg">
+                    <span>Tạm dừng:</span>
+                    <span class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-xs font-mono text-yellow-300">P / ESC</span>
+                </div>
+            </div>
+
+            <button onclick="closeModal('helpModal')" class="w-full py-2.5 bg-cyan-500 text-slate-950 font-bold rounded-xl hover:bg-cyan-400 transition">Đã Hiểu</button>
+        </div>
+    </div>
+
+    <!-- 7. MODAL CÀI ĐẶT -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md">
+            <h3 class="pixel-font text-sm text-pink-400 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-gear"></i> CÀI ĐẶT GAME
+            </h3>
+
+            <div class="space-y-4 mb-6">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-semibold">Âm thanh & SFX</span>
+                    <input type="checkbox" id="settingSound" checked onchange="toggleAudio()" class="w-5 h-5 accent-cyan-500 cursor-pointer">
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm font-semibold">Rung màn hình (Screen Shake)</span>
+                    <input type="checkbox" id="settingShake" checked class="w-5 h-5 accent-cyan-500 cursor-pointer">
+                </div>
+            </div>
+
+            <button onclick="closeModal('settingsModal')" class="w-full py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl hover:bg-slate-700 transition">Lưu & Đóng</button>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        /* ==========================================================================
+           1. GAME ENGINE & AUDIO SYNTHESIZER (WEB AUDIO API)
+           ========================================================================== */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playTone(freq, type, duration, gainVal = 0.1) {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.00001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            playJump() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e) {}
+            }
+
+            playShoot() {
+                this.playTone(800, 'sawtooth', 0.08, 0.05);
+            }
+
+            playCoin() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(987.77, this.ctx.currentTime); // B5
+                    osc.frequency.setValueAtTime(1318.51, this.ctx.currentTime + 0.08); // E6
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.25);
+                } catch(e) {}
+            }
+
+            playExplosion() {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.3);
+                } catch(e) {}
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        function toggleAudio() {
+            audio.enabled = !audio.enabled;
+            const icon = document.getElementById('audioIcon');
+            const settingCheck = document.getElementById('settingSound');
+            if (audio.enabled) {
+                icon.className = 'fa-solid fa-volume-high';
+                if (settingCheck) settingCheck.checked = true;
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+                if (settingCheck) settingCheck.checked = false;
+            }
+        }
+
+        /* ==========================================================================
+           2. GLOBAL STATE & LOCAL STORAGE
+           ========================================================================== */
+        const HEROES = [
+            { name: "Cyber Knight", color: "#00f3ff", hp: 100, speed: 5, dmg: 25 },
+            { name: "Neon Assassin", color: "#ff0055", hp: 80, speed: 6.5, dmg: 35 },
+            { name: "Mech Buster", color: "#ffe600", hp: 140, speed: 4, dmg: 20 }
+        ];
+
+        let state = {
+            coins: parseInt(localStorage.getItem('pixel_coins')) || 0,
+            selectedHeroIdx: 0,
+            highScores: JSON.parse(localStorage.getItem('pixel_scores')) || [
+                { name: 'CyberPro', score: 12500 },
+                { name: 'Gamer99', score: 8400 },
+                { name: 'NeonRider', score: 5100 }
+            ],
+            upgrades: JSON.parse(localStorage.getItem('pixel_upgrades')) || {
+                hp: 0,
+                damage: 0,
+                speed: 0
+            }
+        };
+
+        function saveState() {
+            localStorage.setItem('pixel_coins', state.coins);
+            localStorage.setItem('pixel_scores', JSON.stringify(state.highScores));
+            localStorage.setItem('pixel_upgrades', JSON.stringify(state.upgrades));
+            updateCoinsUI();
+        }
+
+        function updateCoinsUI() {
+            document.getElementById('globalCoinsDisplay').innerText = state.coins;
+        }
+
+        function cycleHero() {
+            state.selectedHeroIdx = (state.selectedHeroIdx + 1) % HEROES.length;
+            document.getElementById('selectedHeroName').innerText = HEROES[state.selectedHeroIdx].name;
+            document.getElementById('selectedHeroName').style.color = HEROES[state.selectedHeroIdx].color;
+        }
+
+        /* ==========================================================================
+           3. SHOP & UPGRADES LOGIC
+           ========================================================================== */
+        function getUpgradeCost(type) {
+            const base = { hp: 100, damage: 150, speed: 120 };
+            return base[type] + (state.upgrades[type] * 50);
+        }
+
+        function updateShopCostsUI() {
+            document.getElementById('shopHpCost').innerText = getUpgradeCost('hp');
+            document.getElementById('shopDmgCost').innerText = getUpgradeCost('damage');
+            document.getElementById('shopSpeedCost').innerText = getUpgradeCost('speed');
+        }
+
+        function buyUpgrade(type) {
+            const cost = getUpgradeCost(type);
+            if (state.coins >= cost) {
+                state.coins -= cost;
+                state.upgrades[type]++;
+                saveState();
+                updateShopCostsUI();
+                audio.playCoin();
+            } else {
+                alert("Bạn không đủ Vàng!");
+            }
+        }
+
+        /* ==========================================================================
+           4. GAME CANVAS LOGIC (PIXEL HERO: DUNGEON QUEST)
+           ========================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let gameRunning = false;
+        let isPaused = false;
+        let animFrameId = null;
+
+        // Game World Constants
+        const GRAVITY = 0.5;
+        let screenShakeTime = 0;
+
+        // Game Dynamic Entities
+        let player = null;
+        let platforms = [];
+        let bullets = [];
+        let enemyBullets = [];
+        let enemies = [];
+        let items = [];
+        let particles = [];
+        let boss = null;
+        let currentStage = 1;
+        let score = 0;
+        let stageCoinsCollected = 0;
+
+        // Key Inputs
+        const keys = {
+            left: false,
+            right: false,
+            up: false,
+            shoot: false
+        };
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight || 450;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        class Player {
+            constructor() {
+                const base = HEROES[state.selectedHeroIdx];
+                this.width = 30;
+                this.height = 42;
+                this.x = 80;
+                this.y = canvas.height - 120;
+                this.vx = 0;
+                this.vy = 0;
+                this.maxHp = base.hp + (state.upgrades.hp * 20);
+                this.hp = this.maxHp;
+                this.speed = base.speed + (state.upgrades.speed * 0.5);
+                this.damage = base.dmg + (state.upgrades.damage * 5);
+                this.color = base.color;
+                this.isGrounded = false;
+                this.facing = 'right';
+                this.shootCooldown = 0;
+            }
+
+            update() {
+                // Horizontal Movement
+                if (keys.left) {
+                    this.vx = -this.speed;
+                    this.facing = 'left';
+                } else if (keys.right) {
+                    this.vx = this.speed;
+                    this.facing = 'right';
+                } else {
+                    this.vx *= 0.7; // friction
+                }
+
+                // Jump
+                if (keys.up && this.isGrounded) {
+                    this.vy = -11.5;
+                    this.isGrounded = false;
+                    audio.playJump();
+                }
+
+                // Gravity
+                this.vy += GRAVITY;
+
+                // Move
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounds Check
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Shoot
+                if (this.shootCooldown > 0) this.shootCooldown--;
+                if (keys.shoot && this.shootCooldown <= 0) {
+                    bullets.push(new Bullet(this.x + (this.facing === 'right' ? this.width : 0), this.y + 18, this.facing, this.damage, false));
+                    this.shootCooldown = 12;
+                    audio.playShoot();
+                }
+
+                // Platform collisions
+                this.isGrounded = false;
+                platforms.forEach(p => {
+                    if (this.x + this.width > p.x && this.x < p.x + p.w) {
+                        if (this.y + this.height >= p.y && this.y + this.height - this.vy <= p.y + 10 && this.vy >= 0) {
+                            this.y = p.y - this.height;
+                            this.vy = 0;
+                            this.isGrounded = true;
+                        }
+                    }
+                });
+
+                // Floor collision
+                if (this.y + this.height >= canvas.height - 20) {
+                    this.y = canvas.height - 20 - this.height;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                }
+            }
+
+            draw() {
+                // Trail / Glow
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+
+                // Body
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Visor / Eyes
+                ctx.fillStyle = '#ffffff';
+                const eyeX = this.facing === 'right' ? this.x + 18 : this.x + 4;
+                ctx.fillRect(eyeX, this.y + 8, 8, 6);
+
+                ctx.shadowBlur = 0; // Reset
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, dir, damage, isEnemy = false) {
+                this.x = x;
+                this.y = y;
+                this.vx = dir === 'right' ? 12 : (dir === 'left' ? -12 : dir.x * 7);
+                this.vy = dir.y ? dir.y * 7 : 0;
+                this.damage = damage;
+                this.isEnemy = isEnemy;
+                this.size = isEnemy ? 6 : 5;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            draw() {
+                ctx.fillStyle = this.isEnemy ? '#ff0055' : '#00f3ff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Enemy {
+            constructor(x, y, type = 'slime') {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.width = type === 'slime' ? 32 : 36;
+                this.height = 30;
+                this.hp = type === 'slime' ? 40 : 80;
+                this.maxHp = this.hp;
+                this.vx = type === 'slime' ? 1.5 : 0;
+                this.shootTimer = 0;
+            }
+
+            update() {
+                if (this.type === 'slime') {
+                    this.x += this.vx;
+                    if (this.x < 100 || this.x > canvas.width - 100) this.vx *= -1;
+                } else if (this.type === 'turret') {
+                    this.shootTimer++;
+                    if (this.shootTimer > 90) {
+                        // Bắn về hướng player
+                        const dx = player.x - this.x;
+                        const dy = player.y - this.y;
+                        const dist = Math.hypot(dx, dy);
+                        enemyBullets.push(new Bullet(this.x, this.y, { x: dx / dist, y: dy / dist }, 15, true));
+                        this.shootTimer = 0;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.type === 'slime' ? '#39ff14' : '#ff0055';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Eyes
+                ctx.fillStyle = '#000';
+                ctx.fillRect(this.x + 6, this.y + 8, 4, 4);
+                ctx.fillRect(this.x + 20, this.y + 8, 4, 4);
+            }
+        }
+
+        class Boss {
+            constructor() {
+                this.width = 90;
+                this.height = 100;
+                this.x = canvas.width - 140;
+                this.y = canvas.height - 120 - this.height;
+                this.hp = 800;
+                this.maxHp = 800;
+                this.shootTimer = 0;
+                this.moveTimer = 0;
+                this.dirY = 1;
+            }
+
+            update() {
+                // Di chuyển lên xuống
+                this.y += this.dirY * 1.5;
+                if (this.y < 50 || this.y > canvas.height - 150) this.dirY *= -1;
+
+                this.shootTimer++;
+                if (this.shootTimer > 50) {
+                    // Tỏa đạn 3 hướng
+                    [-0.3, 0, 0.3].forEach(angle => {
+                        enemyBullets.push(new Bullet(this.x, this.y + 40, { x: -1, y: angle }, 20, true));
+                    });
+                    this.shootTimer = 0;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = '#b026ff';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = '#ffe600';
+                ctx.fillRect(this.x + 10, this.y + 20, 25, 10); // Lò vi sóng mắt Boss
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.size = Math.random() * 4 + 2;
+                this.color = color;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.03;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        class Item {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'coin' or 'heal'
+                this.size = 12;
+            }
+
+            draw() {
+                ctx.fillStyle = this.type === 'coin' ? '#ffe600' : '#ff0055';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        /* ==========================================================================
+           5. GAME STAGE & LEVEL INITIALIZATION
+           ========================================================================== */
+        function initStage(stage) {
+            resizeCanvas();
+            currentStage = stage;
+            player = new Player();
+            bullets = [];
+            enemyBullets = [];
+            enemies = [];
+            items = [];
+            particles = [];
+            boss = null;
+
+            document.getElementById('hudLevel').innerText = `STAGE ${stage}`;
+            document.getElementById('bossHud').classList.add('hidden');
+
+            // Set Platforms
+            platforms = [
+                { x: 120, y: canvas.height - 90, w: 140, h: 14 },
+                { x: 320, y: canvas.height - 160, w: 160, h: 14 },
+                { x: 550, y: canvas.height - 100, w: 140, h: 14 }
+            ];
+
+            if (stage === 1) {
+                enemies.push(new Enemy(200, canvas.height - 50, 'slime'));
+                enemies.push(new Enemy(360, canvas.height - 190, 'turret'));
+                enemies.push(new Enemy(600, canvas.height - 50, 'slime'));
+            } else if (stage === 2) {
+                // BOSS STAGE
+                boss = new Boss();
+                document.getElementById('bossHud').classList.remove('hidden');
+            }
+        }
+
+        function createExplosion(x, y, color = '#ff0055', count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+            audio.playExplosion();
+            if (document.getElementById('settingShake').checked) screenShakeTime = 10;
+        }
+
+        /* ==========================================================================
+           6. MAIN GAME LOOP
+           ========================================================================== */
+        function gameLoop() {
+            if (!gameRunning || isPaused) return;
+
+            // Clear Screen
+            ctx.fillStyle = '#050608';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Apply Screen Shake
+            ctx.save();
+            if (screenShakeTime > 0) {
+                const dx = (Math.random() - 0.5) * 8;
+                const dy = (Math.random() - 0.5) * 8;
+                ctx.translate(dx, dy);
+                screenShakeTime--;
+            }
+
+            // --- DRAW GROUND & PLATFORMS ---
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20); // Floor
+            ctx.fillStyle = '#00f3ff';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 2); // Floor Top Line
+
+            platforms.forEach(p => {
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+                ctx.fillStyle = '#00f3ff';
+                ctx.fillRect(p.x, p.y, p.w, 2);
+            });
+
+            // --- UPDATE & DRAW PLAYER ---
+            player.update();
+            player.draw();
+
+            // --- UPDATE & DRAW BULLETS ---
+            bullets.forEach((b, i) => {
+                b.update();
+                b.draw();
+                // Remove out of bounds
+                if (b.x < 0 || b.x > canvas.width) bullets.splice(i, 1);
+            });
+
+            // --- UPDATE & DRAW ENEMY BULLETS ---
+            enemyBullets.forEach((eb, i) => {
+                eb.update();
+                eb.draw();
+
+                // Player Hit Check
+                if (Math.hypot(eb.x - (player.x + player.width/2), eb.y - (player.y + player.height/2)) < 18) {
+                    player.hp -= eb.damage;
+                    createExplosion(player.x, player.y, '#ff0055', 8);
+                    enemyBullets.splice(i, 1);
+                    if (player.hp <= 0) triggerGameOver();
+                }
+            });
+
+            // --- UPDATE & DRAW ENEMIES ---
+            enemies.forEach((enemy, ei) => {
+                enemy.update();
+                enemy.draw();
+
+                // Check player bullets hitting enemy
+                bullets.forEach((b, bi) => {
+                    if (b.x > enemy.x && b.x < enemy.x + enemy.width && b.y > enemy.y && b.y < enemy.y + enemy.height) {
+                        enemy.hp -= b.damage;
+                        bullets.splice(bi, 1);
+                        createExplosion(b.x, b.y, '#ffe600', 5);
+
+                        if (enemy.hp <= 0) {
+                            score += 200;
+                            items.push(new Item(enemy.x, enemy.y, 'coin'));
+                            enemies.splice(ei, 1);
+                            createExplosion(enemy.x, enemy.y, '#39ff14', 15);
+                        }
+                    }
+                });
+            });
+
+            // --- UPDATE & DRAW BOSS ---
+            if (boss) {
+                boss.update();
+                boss.draw();
+
+                // Player bullets hit Boss
+                bullets.forEach((b, bi) => {
+                    if (b.x > boss.x && b.x < boss.x + boss.width && b.y > boss.y && b.y < boss.y + boss.height) {
+                        boss.hp -= b.damage;
+                        bullets.splice(bi, 1);
+                        createExplosion(b.x, b.y, '#ff0055', 6);
+
+                        // Update Boss HP UI
+                        const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+                        document.getElementById('bossHpBar').style.width = pct + '%';
+                        document.getElementById('bossHpText').innerText = `${boss.hp}/${boss.maxHp}`;
+
+                        if (boss.hp <= 0) {
+                            score += 2000;
+                            stageCoinsCollected += 50;
+                            triggerVictory();
+                        }
+                    }
+                });
+            }
+
+            // --- Check Stage 1 Clearance ---
+            if (currentStage === 1 && enemies.length === 0) {
+                initStage(2); // Auto progress to Boss stage
+            }
+
+            // --- ITEMS PICKUP ---
+            items.forEach((item, ii) => {
+                item.draw();
+                if (Math.hypot(item.x - (player.x + 15), item.y - (player.y + 20)) < 25) {
+                    if (item.type === 'coin') {
+                        stageCoinsCollected += 10;
+                        score += 100;
+                        audio.playCoin();
+                    }
+                    items.splice(ii, 1);
+                }
+            });
+
+            // --- PARTICLES ---
+            particles.forEach((p, pi) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(pi, 1);
+            });
+
+            ctx.restore();
+
+            // --- UPDATE HUD UI ---
+            document.getElementById('hpBar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            document.getElementById('hpText').innerText = `${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}`;
+            document.getElementById('hudScore').innerText = String(score).padStart(6, '0');
+
+            animFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        /* ==========================================================================
+           7. CONTROLS & EVENT LISTENERS
+           ========================================================================== */
+        window.addEventListener('keydown', e => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = true;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = true;
+            if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') keys.up = true;
+            if (e.key === 'j' || e.key === 'J' || e.key === 'z' || e.key === 'Z') keys.shoot = true;
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') togglePause();
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = false;
+            if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = false;
+            if (e.key === 'w' || e.key === 'W' || e.key === ' ' || e.key === 'ArrowUp') keys.up = false;
+            if (e.key === 'j' || e.key === 'J' || e.key === 'z' || e.key === 'Z') keys.shoot = false;
+        });
+
+        // Touch Control Listeners (Mobile)
+        function setupTouchBtn(btnId, keyProp) {
+            const btn = document.getElementById(btnId);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyProp] = true; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyProp] = false; });
+        }
+        setupTouchBtn('btnLeft', 'left');
+        setupTouchBtn('btnRight', 'right');
+        setupTouchBtn('btnJump', 'up');
+        setupTouchBtn('btnShoot', 'shoot');
+
+        /* ==========================================================================
+           8. SCREEN & MODAL MANAGEMENT
+           ========================================================================== */
+        function switchScreen(screenId) {
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function openModal(modalId) {
+            if (modalId === 'shopModal') updateShopCostsUI();
+            if (modalId === 'leaderboardModal') renderLeaderboard();
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function startGame(mode) {
+            switchScreen('gameScreen');
+            score = 0;
+            stageCoinsCollected = 0;
+            gameRunning = true;
+            isPaused = false;
+            initStage(1);
+            requestAnimationFrame(gameLoop);
+        }
+
+        function togglePause() {
+            if (!gameRunning) return;
+            isPaused = !isPaused;
+            const pauseModal = document.getElementById('pauseModal');
+            const pauseIcon = document.getElementById('pauseIcon');
+
+            if (isPaused) {
+                pauseModal.classList.remove('hidden');
+                pauseIcon.className = 'fa-solid fa-play';
+            } else {
+                pauseModal.classList.add('hidden');
+                pauseIcon.className = 'fa-solid fa-pause';
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function restartGame() {
+            closeModal('pauseModal');
+            closeModal('gameOverModal');
+            startGame('dungeon');
+        }
+
+        function quitToMenu() {
+            gameRunning = false;
+            closeModal('pauseModal');
+            closeModal('gameOverModal');
+            closeModal('victoryModal');
+            switchScreen('menuScreen');
+        }
+
+        function triggerGameOver() {
+            gameRunning = false;
+            document.getElementById('goScore').innerText = score;
+            document.getElementById('goCoins').innerText = stageCoinsCollected;
+            state.coins += stageCoinsCollected;
+            saveScore(score);
+            saveState();
+            openModal('gameOverModal');
+        }
+
+        function triggerVictory() {
+            gameRunning = false;
+            document.getElementById('vicScore').innerText = score;
+            document.getElementById('vicCoins').innerText = `+${stageCoinsCollected}`;
+            state.coins += stageCoinsCollected;
+            saveScore(score);
+            saveState();
+            openModal('victoryModal');
+        }
+
+        function saveScore(newScore) {
+            state.highScores.push({ name: 'Player', score: newScore });
+            state.highScores.sort((a, b) => b.score - a.score);
+            state.highScores = state.highScores.slice(0, 5); // Top 5
+            saveState();
+        }
+
+        function renderLeaderboard() {
+            const list = document.getElementById('leaderboardList');
+            list.innerHTML = state.highScores.map((item, idx) => `
+                <div class="flex justify-between items-center p-2 rounded-lg ${idx === 0 ? 'bg-yellow-500/20 border border-yellow-500/40' : 'bg-slate-950'} text-xs">
+                    <span class="font-bold ${idx === 0 ? 'text-yellow-400' : 'text-slate-300'}">#${idx + 1} ${item.name}</span>
+                    <span class="pixel-font text-cyan-400">${item.score}</span>
+                </div>
+            `).join('');
+        }
+
+        // Khởi tạo giao diện ban đầu
+        updateCoinsUI();
+    </script>
+</body>
+</html>
